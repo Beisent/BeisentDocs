@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} - BeisentDocs</title>
+  <link rel="stylesheet" href="{{base_path}}static/css/style.css">
+</head>
+<body class="doc-page">
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a href="{{base_path}}index.html" class="navbar-brand">BeisentDocs</a>
+      <nav class="navbar-nav">
+        {{nav_links}}
+      </nav>
+      <div class="navbar-actions">
+        <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="doc-layout section-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-inner">
+        {{sidebar_nav}}
+      </div>
+    </aside>
+
+    <main class="section-main">
+      {{breadcrumbs}}
+      <div class="section-header">
+        <h1>{{title}}</h1>
+        <p class="section-description">{{description}}</p>
+      </div>
+      {{section_content}}
+      <section class="cards-section">
+        <div class="cards-grid">
+          {{cards}}
+        </div>
+      </section>
+      <footer class="doc-footer">
+        <p>&copy; 2025 Beisent Lab</p>
+      </footer>
+    </main>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>lucide.createIcons();</script>
+  <script src="{{base_path}}static/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} - BeisentDocs</title>
+  <link rel="stylesheet" href="{{base_path}}static/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+</head>
+<body class="doc-page">
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a href="{{base_path}}index.html" class="navbar-brand">BeisentDocs</a>
+      <nav class="navbar-nav">
+        {{nav_links}}
+      </nav>
+      <div class="navbar-actions">
+        <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="doc-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-inner">
+        {{sidebar_nav}}
+      </div>
+    </aside>
+
+    <main class="doc-content">
+      {{breadcrumbs}}
+      <article class="prose">
+        {{content}}
+      </article>
+      <footer class="doc-footer">
+        <p>&copy; 2025 Beisent Lab</p>
+      </footer>
+    </main>
+
+    <aside class="toc-sidebar" id="toc-sidebar">
+      {{toc}}
+    </aside>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <script src="{{base_path}}static/js/main.js"></script>
+  <script>
+    hljs.highlightAll();
+    renderMathInElement(document.querySelector('.prose'), {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '\\(', right: '\\)', display: false},
+      ],
+      throwOnError: false
+    });
+  </script>
+</body>
+</html>

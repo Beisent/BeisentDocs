@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BeisentDocs</title>
+  <link rel="stylesheet" href="{{base_path}}static/css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a href="{{base_path}}index.html" class="navbar-brand">BeisentDocs</a>
+      <nav class="navbar-nav">
+        {{nav_links}}
+      </nav>
+    </div>
+  </header>
+
+  <main class="index-main">
+    <section class="hero">
+      <h1>BeisentDocs</h1>
+      <p class="hero-subtitle">极 简 文 档</p>
+    </section>
+
+    <section class="cards-section">
+      <div class="cards-grid">
+        {{cards}}
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <p>&copy; 2025 Beisent Lab</p>
+    </footer>
+  </main>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>lucide.createIcons();</script>
+  <script src="{{base_path}}static/js/main.js"></script>
+</body>
+</html>
