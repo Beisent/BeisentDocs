@@ -1,4 +1,8 @@
 {
+  "site_name": "BeisentDocs",
+  "site_description": "极简文档",
+  "footer_text": "Beisent Lab",
+  "base_url": "https://beisent.github.io",
   "nav": [
     {"label": "GitHub", "url": "https://github.com/beisent"}
   ]

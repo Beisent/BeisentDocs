@@ -18,12 +18,14 @@ class MarkdownParser:
     def __init__(self):
         self.footnotes: dict[str, str] = {}
         self.headings: list[dict] = []
+        self.heading_slugs: dict[str, int] = {}  # track slug usage for deduplication
 
     # ---- public API -------------------------------------------------------
 
     def parse(self, text: str) -> str:
         self.footnotes.clear()
         self.headings.clear()
+        self.heading_slugs.clear()
         text = text.replace("\r\n", "\n")
         text = self._extract_footnotes(text)
         html = self._parse_blocks(text)
@@ -99,7 +101,16 @@ class MarkdownParser:
             if m:
                 level = len(m.group(1))
                 text_h = m.group(2).strip()
-                slug = re.sub(r'[^\w\u4e00-\u9fff]+', '-', text_h.lower()).strip('-')
+                base_slug = re.sub(r'[^\w\u4e00-\u9fff]+', '-', text_h.lower()).strip('-')
+
+                # deduplicate slug
+                if base_slug in self.heading_slugs:
+                    self.heading_slugs[base_slug] += 1
+                    slug = f"{base_slug}-{self.heading_slugs[base_slug]}"
+                else:
+                    self.heading_slugs[base_slug] = 0
+                    slug = base_slug
+
                 self.headings.append({"level": level, "text": text_h, "slug": slug})
                 result.append(
                     f'<h{level} id="{slug}">'
@@ -189,20 +200,53 @@ class MarkdownParser:
         return items, i
 
     def _build_list(self, items, ordered):
-        tag = "ol" if ordered else "ul"
-        html = f"<{tag}>"
-        for item in items:
-            content = " ".join(item["lines"])
-            # check for task list
-            if content.startswith("[ ] "):
-                content = f'<input type="checkbox" disabled> {self._inline(content[4:])}'
-            elif content.startswith("[x] ") or content.startswith("[X] "):
-                content = f'<input type="checkbox" checked disabled> {self._inline(content[4:])}'
-            else:
-                content = self._inline(content)
-            html += f"<li>{content}</li>"
-        html += f"</{tag}>"
-        return html
+        if not items:
+            return ""
+
+        def build_nested(items, start_idx=0, parent_indent=0):
+            tag = "ol" if ordered else "ul"
+            html = f"<{tag}>"
+            i = start_idx
+            while i < len(items):
+                item = items[i]
+                indent = item["indent"]
+
+                # if this item is less indented than parent, we're done with this level
+                if indent < parent_indent:
+                    break
+
+                # if this item is more indented, skip it (will be handled by recursion)
+                if indent > parent_indent:
+                    i += 1
+                    continue
+
+                # process this item
+                content = " ".join(item["lines"])
+                # check for task list
+                if content.startswith("[ ] "):
+                    content = f'<input type="checkbox" disabled> {self._inline(content[4:])}'
+                elif content.startswith("[x] ") or content.startswith("[X] "):
+                    content = f'<input type="checkbox" checked disabled> {self._inline(content[4:])}'
+                else:
+                    content = self._inline(content)
+
+                html += f"<li>{content}"
+
+                # check if next item is nested
+                if i + 1 < len(items) and items[i + 1]["indent"] > indent:
+                    nested_html, next_i = build_nested(items, i + 1, indent + 2)
+                    html += nested_html
+                    i = next_i
+                else:
+                    i += 1
+
+                html += "</li>"
+
+            html += f"</{tag}>"
+            return html, i
+
+        result, _ = build_nested(items)
+        return result
 
     # ---- table ------------------------------------------------------------
 
@@ -239,8 +283,13 @@ class MarkdownParser:
     # ---- inline parsing ---------------------------------------------------
 
     def _inline(self, text: str) -> str:
-        # inline code
-        text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
+        # protect inline code first by replacing with placeholders
+        code_blocks = []
+        def save_code(m):
+            code_blocks.append(m.group(1))
+            return f"\x00CODE{len(code_blocks)-1}\x00"
+        text = re.sub(r'`([^`]+)`', save_code, text)
+
         # images
         text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', r'<img src="\2" alt="\1" loading="lazy">', text)
         # links
@@ -250,9 +299,9 @@ class MarkdownParser:
         # bold
         text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
         text = re.sub(r'__(.+?)__', r'<strong>\1</strong>', text)
-        # italic
+        # italic (avoid matching underscores in words)
         text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
-        text = re.sub(r'_(.+?)_', r'<em>\1</em>', text)
+        text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'<em>\1</em>', text)
         # strikethrough
         text = re.sub(r'~~(.+?)~~', r'<del>\1</del>', text)
         # mark / highlight
@@ -261,6 +310,13 @@ class MarkdownParser:
         text = re.sub(r'(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)', r'<span class="math-inline">\(\1\)</span>', text)
         # line break
         text = re.sub(r'  $', '<br>', text)
+
+        # restore code blocks
+        def restore_code(m):
+            idx = int(m.group(1))
+            return f'<code>{code_blocks[idx]}</code>'
+        text = re.sub(r'\x00CODE(\d+)\x00', restore_code, text)
+
         return text
 
     @staticmethod
@@ -293,8 +349,16 @@ class SiteBuilder:
     def _load_config(self) -> dict:
         config_path = self.base / "config.json"
         if config_path.exists():
-            return json.loads(config_path.read_text(encoding="utf-8"))
-        return {}
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        else:
+            config = {}
+        # set defaults
+        config.setdefault("site_name", "BeisentDocs")
+        config.setdefault("site_description", "Documentation Site")
+        config.setdefault("footer_text", "Documentation")
+        config.setdefault("base_url", "")
+        config.setdefault("nav", [])
+        return config
 
     def build(self):
         print("==> Building BeisentDocs ...")
@@ -319,8 +383,7 @@ class SiteBuilder:
         index_tpl = self._read_template("index.html")
         root_html = "index.html"
         page = index_tpl.replace("{{cards}}", self._build_cards(tree, root_html))
-        page = page.replace("{{nav_links}}", self._build_nav())
-        page = page.replace("{{base_path}}", "")
+        page = self._apply_common_vars(page, "")
         (self.dist_dir / "index.html").write_text(page, encoding="utf-8")
 
         # render section pages
@@ -332,6 +395,15 @@ class SiteBuilder:
         doc_tpl = self._read_template("doc.html")
         for doc in all_docs:
             self._build_doc_page(doc, doc_tpl, tree)
+
+        # generate search index
+        self._build_search_index(all_docs)
+
+        # generate sitemap
+        self._build_sitemap(all_docs, all_sections)
+
+        # generate 404 page
+        self._build_404_page()
 
         print(f"==> Done! {len(all_docs)} docs, {len(all_sections)} sections built into dist/")
 
@@ -591,7 +663,6 @@ class SiteBuilder:
         hp = section["html_path"]
         base_path = self._compute_base_path(hp)
         cards = self._build_cards(section, hp)
-        nav = self._build_nav()
         sidebar = self._build_sidebar_nav(hp, tree)
         crumb_chain = self._get_crumb_chain(section["slug"], tree)
         breadcrumbs = self._build_breadcrumbs(crumb_chain, hp)
@@ -604,10 +675,9 @@ class SiteBuilder:
         page = page.replace("{{description}}", section["description"])
         page = page.replace("{{section_content}}", section_content)
         page = page.replace("{{cards}}", cards)
-        page = page.replace("{{nav_links}}", nav)
         page = page.replace("{{sidebar_nav}}", sidebar)
         page = page.replace("{{breadcrumbs}}", breadcrumbs)
-        page = page.replace("{{base_path}}", base_path)
+        page = self._apply_common_vars(page, base_path)
 
         out = self.dist_dir / hp
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -622,7 +692,6 @@ class SiteBuilder:
 
         hp = doc["html_path"]
         base_path = self._compute_base_path(hp)
-        nav = self._build_nav()
         sidebar = self._build_sidebar_nav(hp, tree)
 
         # breadcrumbs: section chain + doc title
@@ -630,13 +699,23 @@ class SiteBuilder:
         crumb_chain.append({"title": doc["meta"]["title"], "html_path": hp})
         breadcrumbs = self._build_breadcrumbs(crumb_chain, hp)
 
+        # canonical URL
+        base_url = self.config.get("base_url", "").rstrip("/")
+        canonical_url = f"{base_url}/{hp}" if base_url else ""
+
+        # prev/next navigation
+        all_docs = self._flatten_docs(tree)
+        doc_nav = self._build_doc_nav(doc, all_docs, hp)
+
         page = template.replace("{{title}}", doc["meta"]["title"])
+        page = page.replace("{{description}}", doc["meta"].get("description", ""))
+        page = page.replace("{{canonical_url}}", canonical_url)
         page = page.replace("{{content}}", html_body)
         page = page.replace("{{toc}}", toc)
         page = page.replace("{{sidebar_nav}}", sidebar)
-        page = page.replace("{{nav_links}}", nav)
         page = page.replace("{{breadcrumbs}}", breadcrumbs)
-        page = page.replace("{{base_path}}", base_path)
+        page = page.replace("{{doc_nav}}", doc_nav)
+        page = self._apply_common_vars(page, base_path)
 
         out = self.dist_dir / hp
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -655,8 +734,106 @@ class SiteBuilder:
         html += "</ul></nav>"
         return html
 
+    def _build_doc_nav(self, current_doc: dict, all_docs: list[dict], current_html_path: str) -> str:
+        """Build prev/next navigation for document pages."""
+        try:
+            idx = next(i for i, d in enumerate(all_docs) if d["html_path"] == current_doc["html_path"])
+        except StopIteration:
+            return ""
+
+        html = '<nav class="doc-nav">'
+        if idx > 0:
+            prev_doc = all_docs[idx - 1]
+            prev_link = self._make_link(current_html_path, prev_doc["html_path"])
+            html += (f'<a href="{prev_link}" class="doc-nav-link doc-nav-prev">'
+                     f'<span class="doc-nav-label">← 上一篇</span>'
+                     f'<span class="doc-nav-title">{prev_doc["meta"]["title"]}</span></a>')
+        else:
+            html += '<div></div>'
+
+        if idx < len(all_docs) - 1:
+            next_doc = all_docs[idx + 1]
+            next_link = self._make_link(current_html_path, next_doc["html_path"])
+            html += (f'<a href="{next_link}" class="doc-nav-link doc-nav-next">'
+                     f'<span class="doc-nav-label">下一篇 →</span>'
+                     f'<span class="doc-nav-title">{next_doc["meta"]["title"]}</span></a>')
+
+        html += '</nav>'
+        return html
+
     def _read_template(self, name: str) -> str:
         return (self.templates_dir / name).read_text(encoding="utf-8")
+
+    def _build_search_index(self, all_docs: list[dict]):
+        """Generate search index JSON for client-side search."""
+        index = []
+        for doc in all_docs:
+            # strip HTML tags from body for plain text content
+            plain_text = re.sub(r'<[^>]+>', '', self.parser.parse(doc["body"]))
+            # get first 200 chars as excerpt
+            excerpt = plain_text[:200].strip()
+            if len(plain_text) > 200:
+                excerpt += "..."
+
+            index.append({
+                "title": doc["meta"]["title"],
+                "description": doc["meta"].get("description", ""),
+                "url": doc["html_path"],
+                "content": plain_text[:1000],  # limit content for index size
+                "excerpt": excerpt
+            })
+
+        index_path = self.dist_dir / "search-index.json"
+        index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _build_sitemap(self, all_docs: list[dict], all_sections: list[dict]):
+        """Generate sitemap.xml for SEO."""
+        from datetime import datetime
+        base_url = self.config.get("base_url", "").rstrip("/")
+        if not base_url:
+            return  # skip sitemap if no base_url configured
+
+        now = datetime.now().strftime("%Y-%m-%d")
+        xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+        xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+
+        # add homepage
+        xml += f'  <url>\n    <loc>{base_url}/</loc>\n'
+        xml += f'    <lastmod>{now}</lastmod>\n    <priority>1.0</priority>\n  </url>\n'
+
+        # add sections
+        for section in all_sections:
+            url = f"{base_url}/{section['html_path']}"
+            xml += f'  <url>\n    <loc>{url}</loc>\n'
+            xml += f'    <lastmod>{now}</lastmod>\n    <priority>0.8</priority>\n  </url>\n'
+
+        # add docs
+        for doc in all_docs:
+            url = f"{base_url}/{doc['html_path']}"
+            xml += f'  <url>\n    <loc>{url}</loc>\n'
+            xml += f'    <lastmod>{now}</lastmod>\n    <priority>0.9</priority>\n  </url>\n'
+
+        xml += '</urlset>'
+
+        sitemap_path = self.dist_dir / "sitemap.xml"
+        sitemap_path.write_text(xml, encoding="utf-8")
+
+    def _build_404_page(self):
+        """Generate 404 error page."""
+        template = self._read_template("404.html")
+        page = self._apply_common_vars(template, "")
+        (self.dist_dir / "404.html").write_text(page, encoding="utf-8")
+
+    def _apply_common_vars(self, page: str, base_path: str) -> str:
+        """Apply common template variables to a page."""
+        from datetime import datetime
+        page = page.replace("{{site_name}}", self.config["site_name"])
+        page = page.replace("{{site_description}}", self.config["site_description"])
+        page = page.replace("{{footer_text}}", self.config["footer_text"])
+        page = page.replace("{{current_year}}", str(datetime.now().year))
+        page = page.replace("{{nav_links}}", self._build_nav())
+        page = page.replace("{{base_path}}", base_path)
+        return page
 
 
 # ---------------------------------------------------------------------------
@@ -683,24 +860,142 @@ def watch():
     builder.build()
 
     docs_dir = Path(__file__).parent / "docs"
-    last_hash = _dir_hash(docs_dir)
+    templates_dir = Path(__file__).parent / "templates"
+    static_dir = Path(__file__).parent / "static"
+    config_file = Path(__file__).parent / "config.json"
+
+    last_hash = _compute_watch_hash(docs_dir, templates_dir, static_dir, config_file)
 
     print("==> Watching for changes ... (Ctrl+C to stop)")
     while True:
         time.sleep(1)
-        current = _dir_hash(docs_dir)
+        current = _compute_watch_hash(docs_dir, templates_dir, static_dir, config_file)
         if current != last_hash:
             print("==> Change detected, rebuilding ...")
             builder.build()
             last_hash = current
 
 
-def _dir_hash(path: Path) -> str:
+def _compute_watch_hash(docs_dir: Path, templates_dir: Path, static_dir: Path, config_file: Path) -> str:
+    """Compute hash of all watched files."""
     h = hashlib.md5()
-    for f in sorted(path.rglob("*.md")):
+
+    # Hash docs
+    for f in sorted(docs_dir.rglob("*.md")):
         h.update(f.read_bytes())
         h.update(str(f.stat().st_mtime).encode())
+
+    # Hash templates
+    if templates_dir.exists():
+        for f in sorted(templates_dir.rglob("*.html")):
+            h.update(f.read_bytes())
+            h.update(str(f.stat().st_mtime).encode())
+
+    # Hash static files
+    if static_dir.exists():
+        for f in sorted(static_dir.rglob("*")):
+            if f.is_file():
+                h.update(f.read_bytes())
+                h.update(str(f.stat().st_mtime).encode())
+
+    # Hash config
+    if config_file.exists():
+        h.update(config_file.read_bytes())
+        h.update(str(config_file.stat().st_mtime).encode())
+
     return h.hexdigest()
+
+
+def dev(port=8000):
+    """Run development server with auto-rebuild and live reload."""
+    import threading
+    import time
+    import http.server
+    import socketserver
+
+    builder = SiteBuilder()
+
+    # Inject live reload script into templates during dev mode
+    def inject_livereload(html: str) -> str:
+        reload_script = '''
+<script>
+(function() {
+  let lastCheck = Date.now();
+  setInterval(() => {
+    fetch('/livereload-check?' + lastCheck)
+      .then(res => res.text())
+      .then(data => {
+        if (data === 'reload') {
+          console.log('[LiveReload] Reloading...');
+          location.reload();
+        }
+        lastCheck = Date.now();
+      })
+      .catch(() => {});
+  }, 1000);
+})();
+</script>
+</body>'''
+        return html.replace('</body>', reload_script)
+
+    # Custom handler with live reload endpoint
+    class LiveReloadHandler(http.server.SimpleHTTPRequestHandler):
+        last_build_time = time.time()
+
+        def do_GET(self):
+            if self.path.startswith('/livereload-check'):
+                self.send_response(200)
+                self.send_header('Content-type', 'text/plain')
+                self.end_headers()
+                query_time = float(self.path.split('?')[1]) / 1000 if '?' in self.path else 0
+                if LiveReloadHandler.last_build_time > query_time:
+                    self.wfile.write(b'reload')
+                else:
+                    self.wfile.write(b'ok')
+            else:
+                super().do_GET()
+
+    # Initial build with livereload injection
+    builder.build()
+    for html_file in builder.dist_dir.rglob("*.html"):
+        content = html_file.read_text(encoding="utf-8")
+        html_file.write_text(inject_livereload(content), encoding="utf-8")
+
+    # Start file watcher in background thread
+    docs_dir = Path(__file__).parent / "docs"
+    templates_dir = Path(__file__).parent / "templates"
+    static_dir = Path(__file__).parent / "static"
+    config_file = Path(__file__).parent / "config.json"
+
+    last_hash = _compute_watch_hash(docs_dir, templates_dir, static_dir, config_file)
+
+    def watch_files():
+        nonlocal last_hash
+        while True:
+            time.sleep(1)
+            current = _compute_watch_hash(docs_dir, templates_dir, static_dir, config_file)
+            if current != last_hash:
+                print("==> Change detected, rebuilding ...")
+                builder.build()
+                # Re-inject livereload script
+                for html_file in builder.dist_dir.rglob("*.html"):
+                    content = html_file.read_text(encoding="utf-8")
+                    html_file.write_text(inject_livereload(content), encoding="utf-8")
+                LiveReloadHandler.last_build_time = time.time()
+                last_hash = current
+
+    watcher_thread = threading.Thread(target=watch_files, daemon=True)
+    watcher_thread.start()
+
+    # Start HTTP server
+    os.chdir(builder.dist_dir)
+    with socketserver.TCPServer(("", port), LiveReloadHandler) as httpd:
+        print(f"==> Dev server running at http://localhost:{port}")
+        print("==> Watching for changes with live reload enabled...")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\n==> Server stopped.")
 
 
 # ---------------------------------------------------------------------------
@@ -713,5 +1008,8 @@ if __name__ == "__main__":
         serve(port)
     elif len(sys.argv) > 1 and sys.argv[1] == "watch":
         watch()
+    elif len(sys.argv) > 1 and sys.argv[1] == "dev":
+        port = int(sys.argv[2]) if len(sys.argv) > 2 else 8000
+        dev(port)
     else:
         SiteBuilder().build()

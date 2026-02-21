@@ -5,12 +5,15 @@
 ## 特性
 
 - **零依赖** — 仅使用 Python 标准库，无需 `pip install`
-- **Markdown 扩展** — GFM 表格、任务列表、脚注、高亮、删除线、提示块（NOTE/TIP/WARNING/IMPORTANT/CAUTION）
+- **Markdown 扩展** — GFM 表格、任务列表、脚注、高亮、删除线、提示块（NOTE/TIP/WARNING/IMPORTANT/CAUTION）、嵌套列表
 - **代码高亮** — 通过 Highlight.js 支持多语言语法高亮
 - **数学公式** — 通过 KaTeX 渲染行内 `$...$` 和块级 `$$...$$` 公式
-- **自动导航** — 侧边栏、面包屑、页内目录（TOC）自动生成
+- **自动导航** — 侧边栏、面包屑、页内目录（TOC）、上一篇/下一篇自动生成
+- **全文搜索** — 客户端搜索，支持 Ctrl+K / Cmd+K 快捷键
+- **暗色模式** — 支持亮色/暗色主题切换，本地存储持久化
 - **响应式设计** — 适配桌面和移动端
-- **开发友好** — 内置 HTTP 服务器和文件监听自动重建
+- **SEO 优化** — 自动生成 sitemap.xml、meta 标签、Open Graph 标签
+- **开发友好** — 内置 HTTP 服务器、文件监听自动重建、LiveReload 热更新
 
 ## 快速开始
 
@@ -35,7 +38,9 @@ python build.py serve
 python build.py              # 构建站点到 dist/
 python build.py serve        # 构建并启动服务器（默认端口 8000）
 python build.py serve 3000   # 指定端口
-python build.py watch        # 监听 docs/ 变化，自动重建
+python build.py watch        # 监听文件变化，自动重建
+python build.py dev          # 开发模式（自动重建 + LiveReload，默认端口 8000）
+python build.py dev 3000     # 开发模式指定端口
 ```
 
 ## 项目结构
@@ -53,9 +58,14 @@ BeisentDocs/
 ├── templates/            # HTML 页面模板
 │   ├── index.html        # 首页
 │   ├── doc.html          # 文档页
-│   └── section.html      # 分区页
+│   ├── section.html      # 分区页
+│   └── 404.html          # 404 错误页
 ├── static/               # 静态资源（CSS/JS）
 └── dist/                 # 构建输出（自动生成）
+    ├── *.html            # 生成的 HTML 页面
+    ├── search-index.json # 搜索索引
+    ├── sitemap.xml       # 站点地图
+    └── static/           # 复制的静态资源
 ```
 
 ## 编写文档
@@ -96,15 +106,27 @@ order: 1
 
 ## 配置
 
-`config.json` 用于配置顶部导航栏链接：
+`config.json` 用于配置站点信息和导航栏链接：
 
 ```json
 {
+  "site_name": "BeisentDocs",
+  "site_description": "极简文档",
+  "footer_text": "Beisent Lab",
+  "base_url": "https://beisent.github.io",
   "nav": [
     {"label": "GitHub", "url": "https://github.com/beisent"}
   ]
 }
 ```
+
+| 字段 | 说明 |
+|:-----|:-----|
+| `site_name` | 站点名称，显示在导航栏和页面标题 |
+| `site_description` | 站点描述，显示在首页 |
+| `footer_text` | 页脚版权信息 |
+| `base_url` | 站点基础 URL，用于生成 sitemap.xml 和 SEO 标签 |
+| `nav` | 顶部导航栏外部链接列表 |
 
 ## 自定义样式
 
