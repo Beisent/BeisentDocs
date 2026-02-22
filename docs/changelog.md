@@ -35,6 +35,6 @@ BeisentDocs 首个正式版本。
 ```
 语言：       Python 3.10+
 外部依赖：   无（仅使用标准库）
-客户端依赖： Highlight.js, KaTeX, Lucide Icons（CDN 加载）
+客户端依赖： Highlight.js, KaTeX（CDN 加载），内置 SVG 图标
 输出格式：   静态 HTML/CSS/JS
 ```

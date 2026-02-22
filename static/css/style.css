@@ -173,27 +173,54 @@ a { color: inherit; text-decoration: none; }
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: var(--border);
+  gap: 12px;
 }
 .card {
+  position: relative;
   display: flex;
   gap: 14px;
   padding: 1.25rem;
   background: var(--bg-card);
   text-decoration: none;
   color: var(--text);
-  transition: background 0.2s;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
-.card::before { display: none; }
+.card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 10px 0 0 10px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transition: transform 0.2s;
+}
+.card::after {
+  content: '→';
+  position: absolute;
+  right: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%) translateX(8px);
+  opacity: 0;
+  font-size: 1rem;
+  color: var(--text-muted);
+  transition: opacity 0.2s, transform 0.2s;
+}
 .card:hover {
-  background: var(--bg-hover);
-  border-color: transparent;
-  box-shadow: none;
-  transform: none;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-color: var(--border);
+}
+.card:hover::before {
+  transform: scaleY(1);
+}
+.card:hover::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
 }
 .card-icon {
   width: 36px;
@@ -205,19 +232,28 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: background 0.2s, color 0.2s;
+}
+.card:hover .card-icon {
+  background: var(--accent);
+  color: var(--bg-card);
 }
 .card-body { min-width: 0; }
 .card-tag {
+  display: inline-block;
   font-size: .7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .06em;
   color: var(--text-muted);
+  background: var(--bg-code);
+  padding: 1px 8px;
+  border-radius: 50px;
 }
 .card h3 {
   font-size: 1rem;
   font-weight: 600;
-  margin: 2px 0 4px;
+  margin: 6px 0 4px;
 }
 .card p {
   font-size: .85rem;
@@ -227,6 +263,9 @@ a { color: inherit; text-decoration: none; }
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+[data-theme="dark"] .card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 /* ---- Doc Page Layout --------------------------------------------------- */
@@ -579,6 +618,10 @@ a { color: inherit; text-decoration: none; }
 .card-section .card-icon {
   background: var(--text);
   color: var(--bg-card);
+}
+.card-section:hover .card-icon {
+  background: var(--bg-code);
+  color: var(--text-secondary);
 }
 
 /* ---- Sidebar: Recursive Collapsible Nav -------------------------------- */

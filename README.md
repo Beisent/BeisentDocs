@@ -1,6 +1,6 @@
 # BeisentDocs
 
-轻量级 Markdown 文档站点生成器，纯 Python 实现，零外部依赖。
+轻量级 Markdown 文档站点生成器，纯 Python 单文件实现，零外部依赖。
 
 ## 特性
 
@@ -97,7 +97,7 @@ order: 1
 | `title` | 文档标题，未指定时从 `#` 标题提取 |
 | `description` | 简短描述，用于卡片展示 |
 | `tag` | 分类标签（guide/api/reference/tutorial/example/info） |
-| `icon` | [Lucide](https://lucide.dev/icons/) 图标名 |
+| `icon` | 内置 SVG 图标名（如 `book-open`、`code`、`rocket`） |
 | `order` | 排序权重，数字越小越靠前 |
 
 ### 分区
@@ -139,7 +139,7 @@ order: 1
 | 构建脚本 | Python 3.10+（标准库） |
 | 代码高亮 | [Highlight.js](https://highlightjs.org/)（CDN） |
 | 数学渲染 | [KaTeX](https://katex.org/)（CDN） |
-| 图标 | [Lucide Icons](https://lucide.dev/)（CDN） |
+| 图标 | 内置 SVG 图标（无外部依赖） |
 | 输出 | 静态 HTML/CSS/JS |
 
 ## License

@@ -9,6 +9,62 @@ import hashlib
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
+# Inline SVG icon data (replaces Lucide CDN dependency)
+# ---------------------------------------------------------------------------
+
+ICONS = {
+    "book-open": (
+        '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>'
+        '<path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>'
+    ),
+    "code": (
+        '<polyline points="16 18 22 12 16 6"/>'
+        '<polyline points="8 6 2 12 8 18"/>'
+    ),
+    "graduation-cap": (
+        '<path d="M22 10v6M2 10l10-5 10 5-10 5z"/>'
+        '<path d="M6 12v5c0 2 4 3 6 3s6-1 6-3v-5"/>'
+    ),
+    "bookmark": (
+        '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>'
+    ),
+    "lightbulb": (
+        '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>'
+        '<path d="M9 18h6"/>'
+        '<path d="M10 22h4"/>'
+    ),
+    "rocket": (
+        '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>'
+        '<path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>'
+        '<path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>'
+        '<path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>'
+    ),
+    "download": (
+        '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'
+        '<polyline points="7 10 12 15 17 10"/>'
+        '<line x1="12" y1="15" x2="12" y2="3"/>'
+    ),
+    "settings": (
+        '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>'
+        '<circle cx="12" cy="12" r="3"/>'
+    ),
+    "file-text": (
+        '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>'
+        '<polyline points="14 2 14 8 20 8"/>'
+        '<line x1="16" y1="13" x2="8" y2="13"/>'
+        '<line x1="16" y1="17" x2="8" y2="17"/>'
+        '<line x1="10" y1="9" x2="8" y2="9"/>'
+    ),
+    "folder": (
+        '<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z"/>'
+    ),
+    "clock": (
+        '<circle cx="12" cy="12" r="10"/>'
+        '<polyline points="12 6 12 12 16 14"/>'
+    ),
+}
+
+# ---------------------------------------------------------------------------
 # Markdown parser (zero external dependencies)
 # ---------------------------------------------------------------------------
 
@@ -547,6 +603,14 @@ class SiteBuilder:
                 return v
         return "file-text"
 
+    def _get_icon_svg(self, icon_name: str, size: int = 20) -> str:
+        inner = ICONS.get(icon_name, ICONS["file-text"])
+        return (
+            f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" '
+            f'fill="none" stroke="currentColor" stroke-width="2" '
+            f'stroke-linecap="round" stroke-linejoin="round">{inner}</svg>'
+        )
+
     # ---- card generation --------------------------------------------------
 
     def _build_cards(self, section: dict, from_html_path: str) -> str:
@@ -557,7 +621,7 @@ class SiteBuilder:
             icon = child["icon"]
             cards.append(
                 f'<a href="{link}" class="card card-section">'
-                f'<div class="card-icon"><i data-lucide="{icon}"></i></div>'
+                f'<div class="card-icon">{self._get_icon_svg(icon)}</div>'
                 f'<div class="card-body">'
                 f'<span class="card-tag">section</span>'
                 f'<h3>{child["title"]}</h3>'
@@ -571,7 +635,7 @@ class SiteBuilder:
             tag = doc["meta"].get("tag", "doc")
             cards.append(
                 f'<a href="{link}" class="card">'
-                f'<div class="card-icon"><i data-lucide="{icon}"></i></div>'
+                f'<div class="card-icon">{self._get_icon_svg(icon)}</div>'
                 f'<div class="card-body">'
                 f'<span class="card-tag">{tag}</span>'
                 f'<h3>{doc["meta"]["title"]}</h3>'

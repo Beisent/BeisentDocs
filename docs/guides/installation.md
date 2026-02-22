@@ -110,7 +110,7 @@ order: 1
 | `title` | 否 | 文档标题。未指定时自动从第一个 `#` 标题提取 |
 | `description` | 否 | 简短描述。未指定时自动截取正文前 160 个字符 |
 | `tag` | 否 | 分类标签，显示在卡片上。如 `guide`、`api`、`reference`、`tutorial`、`example`、`info` |
-| `icon` | 否 | 卡片图标，使用 [Lucide](https://lucide.dev/icons/) 图标名。如 `book-open`、`code`、`rocket` |
+| `icon` | 否 | 卡片图标，使用内置 SVG 图标名。如 `book-open`、`code`、`rocket` |
 | `order` | 否 | 排序权重，数字越小越靠前，默认 99 |
 
 ### 自动图标推断
