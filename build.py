@@ -670,10 +670,16 @@ class SiteBuilder:
 
     def _build_sidebar_section(self, section: dict, current_html_path: str) -> str:
         is_ancestor = current_html_path.startswith(section["slug"] + "/")
-        open_attr = " open" if is_ancestor else ""
+        is_current = current_html_path == section["html_path"]
+        open_attr = " open" if is_ancestor or is_current else ""
+
+        section_link = self._make_link(current_html_path, section["html_path"])
+        active = " active" if is_current else ""
 
         html = f'<details class="nav-section"{open_attr}>'
-        html += f'<summary class="nav-section-title">{section["title"]}</summary>'
+        html += (f'<summary class="nav-section-title">'
+                 f'<a href="{section_link}" class="nav-section-link{active}">{section["title"]}</a>'
+                 f'</summary>')
         html += '<div class="nav-section-content">'
 
         for doc in section["docs"]:

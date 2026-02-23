@@ -23,6 +23,8 @@
   --text-muted: #999;
   --border: #e5e5e5;
   --accent: #1a1a1a;
+  --bg-mark: #e5e5e5;
+  --text-mark: #1a1a1a;
 }
 
 [data-theme="dark"] {
@@ -37,6 +39,8 @@
   --text-muted: #737373;
   --border: #333;
   --accent: #e5e5e5;
+  --bg-mark: #404040;
+  --text-mark: #e5e5e5;
 }
 
 /* ---- Reset ------------------------------------------------------------- */
@@ -402,10 +406,10 @@ a { color: inherit; text-decoration: none; }
 .prose em { font-style: italic; }
 .prose del { opacity: .5; }
 .prose mark {
-  background: #e5e5e5;
+  background: var(--bg-mark);
   padding: 2px 5px;
   border-radius: 3px;
-  color: var(--text);
+  color: var(--text-mark);
 }
 
 .prose code {
@@ -645,6 +649,13 @@ a { color: inherit; text-decoration: none; }
   transition: color 0.2s;
 }
 .nav-section-title:hover { color: var(--text); }
+.nav-section-link {
+  color: inherit;
+  text-decoration: none;
+  flex: 1;
+}
+.nav-section-link:hover { color: var(--text); }
+.nav-section-link.active { color: var(--primary); }
 .nav-section-title::-webkit-details-marker { display: none; }
 .nav-section-title::before {
   content: '▸';

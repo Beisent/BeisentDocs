@@ -9,15 +9,26 @@
   const themeToggle = document.getElementById('theme-toggle');
   const html = document.documentElement;
 
+  function applyHljsTheme(theme) {
+    const light = document.getElementById('hljs-light');
+    const dark = document.getElementById('hljs-dark');
+    if (light && dark) {
+      light.disabled = theme === 'dark';
+      dark.disabled = theme !== 'dark';
+    }
+  }
+
   // Load saved theme or default to light
   const savedTheme = localStorage.getItem('theme') || 'light';
   html.setAttribute('data-theme', savedTheme);
+  applyHljsTheme(savedTheme);
 
   themeToggle?.addEventListener('click', () => {
     const currentTheme = html.getAttribute('data-theme');
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     html.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
+    applyHljsTheme(newTheme);
   });
 
   // ---- Mobile sidebar toggle -------------------------------------------
@@ -29,6 +40,13 @@
   });
   overlay?.addEventListener('click', () => {
     sidebar?.classList.remove('open');
+  });
+
+  // ---- Section link: navigate without toggling <details> ---------------
+  document.querySelectorAll('.nav-section-title a').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
   });
 
   // ---- Copy button on code blocks --------------------------------------
