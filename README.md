@@ -1,6 +1,6 @@
 # BeisentDocs
 
-轻量级 Markdown 文档站点生成器，纯 Python 单文件实现，零外部依赖。
+轻量级 Markdown 文档站点生成器，纯 Python 实现，零外部依赖。
 
 ## 特性
 
@@ -47,7 +47,13 @@ python build.py dev 3000     # 开发模式指定端口
 
 ```
 BeisentDocs/
-├── build.py              # 构建脚本（Markdown 解析器 + 站点生成器）
+├── build.py              # CLI 入口（构建/serve/watch/dev）
+├── builder/              # 核心模块包
+│   ├── __init__.py       # 包入口，导出 MarkdownParser、SiteBuilder
+│   ├── icons.py          # 内置 SVG 图标数据
+│   ├── parser.py         # Markdown 解析器
+│   ├── site.py           # 站点生成器
+│   └── server.py         # 开发服务器（serve/watch/dev）
 ├── config.json           # 站点配置（导航链接）
 ├── docs/                 # Markdown 源文件
 │   ├── getting-started.md

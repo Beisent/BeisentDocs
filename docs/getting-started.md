@@ -51,7 +51,13 @@ python build.py watch
 
 ```
 BeisentDocs/
-├── build.py              # 构建脚本（Markdown 解析器 + 站点生成器）
+├── build.py              # CLI 入口（构建/serve/watch/dev）
+├── builder/              # 核心模块包
+│   ├── __init__.py       # 包入口，导出 MarkdownParser、SiteBuilder
+│   ├── icons.py          # 内置 SVG 图标数据
+│   ├── parser.py         # Markdown 解析器
+│   ├── site.py           # 站点生成器
+│   └── server.py         # 开发服务器（serve/watch/dev）
 ├── config.json           # 站点配置（导航链接等）
 ├── docs/                 # Markdown 源文件目录
 │   ├── getting-started.md
