@@ -69,6 +69,8 @@ class MarkdownParser:
                     i += 1
                 i += 1  # skip closing fence
                 code = self._escape_html("\n".join(code_lines))
+                # Escape template placeholders to prevent replacement
+                code = code.replace("{{", "&#123;&#123;").replace("}}", "&#125;&#125;")
                 lang_attr = f' class="language-{lang}"' if lang else ""
                 result.append(f'<pre><code{lang_attr}>{code}</code></pre>')
                 continue
@@ -164,7 +166,7 @@ class MarkdownParser:
 
             # paragraph
             para_lines: list[str] = []
-            while i < len(lines) and lines[i].strip() and not re.match(r'^(#{1,6}\s|```|~~~|>|\*{3,}|-{3,}|_{3,}|\|)', lines[i]):
+            while i < len(lines) and lines[i].strip() and not re.match(r'^(#{1,6}\s|```|~~~|>|\*{3,}|-{3,}|_{3,}|\||[\s]*[-*+]\s|[\s]*\d+\.\s)', lines[i]):
                 para_lines.append(lines[i])
                 i += 1
             result.append(f"<p>{self._inline(' '.join(para_lines))}</p>")
@@ -305,7 +307,10 @@ class MarkdownParser:
         # restore code blocks
         def restore_code(m):
             idx = int(m.group(1))
-            return f'<code>{code_blocks[idx]}</code>'
+            code = self._escape_html(code_blocks[idx])
+            # Also escape template placeholders to prevent replacement
+            code = code.replace("{{", "&#123;&#123;").replace("}}", "&#125;&#125;")
+            return f'<code>{code}</code>'
         text = re.sub(r'\x00CODE(\d+)\x00', restore_code, text)
 
         return text
