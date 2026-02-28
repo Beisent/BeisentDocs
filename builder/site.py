@@ -5,6 +5,8 @@ import re
 import json
 import shutil
 from pathlib import Path
+from typing import Dict, List, Tuple, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from builder.icons import ICONS
 from builder.parser import MarkdownParser
@@ -23,6 +25,7 @@ class SiteBuilder:
         self.templates_dir = self.base / templates_dir
         self.parser = MarkdownParser()
         self.config = self._load_config()
+        self._template_cache: Dict[str, str] = {}
 
     # ---- public entry point -----------------------------------------------
 
@@ -41,6 +44,7 @@ class SiteBuilder:
         return config
 
     def build(self):
+        """Build the documentation site with parallel processing."""
         print("==> Building BeisentDocs ...")
         if self.dist_dir.exists():
             shutil.rmtree(self.dist_dir)
@@ -66,15 +70,30 @@ class SiteBuilder:
         page = self._apply_common_vars(page, "")
         (self.dist_dir / "index.html").write_text(page, encoding="utf-8")
 
-        # render section pages
+        # Pre-load templates for parallel processing
         section_tpl = self._read_template("section.html")
-        for section in all_sections:
-            self._build_section_page(section, section_tpl, tree)
-
-        # render doc pages
         doc_tpl = self._read_template("doc.html")
-        for doc in all_docs:
-            self._build_doc_page(doc, doc_tpl, tree)
+
+        # Parallel rendering of section and doc pages
+        with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as executor:
+            # Submit section page tasks
+            section_futures = [
+                executor.submit(self._build_section_page, section, section_tpl, tree)
+                for section in all_sections
+            ]
+
+            # Submit doc page tasks
+            doc_futures = [
+                executor.submit(self._build_doc_page, doc, doc_tpl, tree)
+                for doc in all_docs
+            ]
+
+            # Wait for all tasks to complete
+            for future in as_completed(section_futures + doc_futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"    Error during page generation: {e}")
 
         # generate search index
         self._build_search_index(all_docs)
@@ -159,13 +178,15 @@ class SiteBuilder:
 
     # ---- tree flattening --------------------------------------------------
 
-    def _flatten_docs(self, section: dict) -> list[dict]:
+    def _flatten_docs(self, section: dict) -> List[dict]:
+        """Flatten document tree into a list."""
         result = list(section["docs"])
         for child in section["children"]:
             result.extend(self._flatten_docs(child))
         return result
 
-    def _flatten_sections(self, section: dict) -> list[dict]:
+    def _flatten_sections(self, section: dict) -> List[dict]:
+        """Flatten section tree into a list."""
         result = []
         for child in section["children"]:
             result.append(child)
@@ -187,7 +208,8 @@ class SiteBuilder:
     # ---- frontmatter ------------------------------------------------------
 
     @staticmethod
-    def _extract_meta(text: str) -> tuple[dict, str]:
+    def _extract_meta(text: str) -> Tuple[Dict[str, str], str]:
+        """Extract frontmatter metadata from markdown text."""
         meta = {}
         body = text
         if text.startswith("---"):
@@ -428,7 +450,7 @@ class SiteBuilder:
         html += "</ul></nav>"
         return html
 
-    def _build_doc_nav(self, current_doc: dict, all_docs: list[dict], current_html_path: str) -> str:
+    def _build_doc_nav(self, current_doc: dict, all_docs: List[dict], current_html_path: str) -> str:
         """Build prev/next navigation for document pages."""
         try:
             idx = next(i for i, d in enumerate(all_docs) if d["html_path"] == current_doc["html_path"])
@@ -440,7 +462,7 @@ class SiteBuilder:
             prev_doc = all_docs[idx - 1]
             prev_link = self._make_link(current_html_path, prev_doc["html_path"])
             html += (f'<a href="{prev_link}" class="doc-nav-link doc-nav-prev">'
-                     f'<span class="doc-nav-label">← 上一篇</span>'
+                     f'<span class="doc-nav-label">← Previous</span>'
                      f'<span class="doc-nav-title">{prev_doc["meta"]["title"]}</span></a>')
         else:
             html += '<div></div>'
@@ -449,17 +471,20 @@ class SiteBuilder:
             next_doc = all_docs[idx + 1]
             next_link = self._make_link(current_html_path, next_doc["html_path"])
             html += (f'<a href="{next_link}" class="doc-nav-link doc-nav-next">'
-                     f'<span class="doc-nav-label">下一篇 →</span>'
+                     f'<span class="doc-nav-label">Next →</span>'
                      f'<span class="doc-nav-title">{next_doc["meta"]["title"]}</span></a>')
 
         html += '</nav>'
         return html
 
     def _read_template(self, name: str) -> str:
-        return (self.templates_dir / name).read_text(encoding="utf-8")
+        """Read template with caching."""
+        if name not in self._template_cache:
+            self._template_cache[name] = (self.templates_dir / name).read_text(encoding="utf-8")
+        return self._template_cache[name]
 
-    def _build_search_index(self, all_docs: list[dict]):
-        """Generate search index JSON for client-side search."""
+    def _build_search_index(self, all_docs: List[dict]):
+        """Generate search index JSON for client-side search with improved performance."""
         index = []
         for doc in all_docs:
             # strip HTML tags from body for plain text content
@@ -478,10 +503,10 @@ class SiteBuilder:
             })
 
         index_path = self.dist_dir / "search-index.json"
-        index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+        index_path.write_text(json.dumps(index, ensure_ascii=False, indent=None, separators=(',', ':')), encoding="utf-8")
 
-    def _build_sitemap(self, all_docs: list[dict], all_sections: list[dict]):
-        """Generate sitemap.xml for SEO."""
+    def _build_sitemap(self, all_docs: List[dict], all_sections: List[dict]):
+        """Generate sitemap.xml for SEO with improved structure."""
         from datetime import datetime
         base_url = self.config.get("base_url", "").rstrip("/")
         if not base_url:
@@ -493,19 +518,19 @@ class SiteBuilder:
 
         # add homepage
         xml += f'  <url>\n    <loc>{base_url}/</loc>\n'
-        xml += f'    <lastmod>{now}</lastmod>\n    <priority>1.0</priority>\n  </url>\n'
+        xml += f'    <lastmod>{now}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>\n'
 
         # add sections
         for section in all_sections:
             url = f"{base_url}/{section['html_path']}"
             xml += f'  <url>\n    <loc>{url}</loc>\n'
-            xml += f'    <lastmod>{now}</lastmod>\n    <priority>0.8</priority>\n  </url>\n'
+            xml += f'    <lastmod>{now}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n'
 
         # add docs
         for doc in all_docs:
             url = f"{base_url}/{doc['html_path']}"
             xml += f'  <url>\n    <loc>{url}</loc>\n'
-            xml += f'    <lastmod>{now}</lastmod>\n    <priority>0.9</priority>\n  </url>\n'
+            xml += f'    <lastmod>{now}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.9</priority>\n  </url>\n'
 
         xml += '</urlset>'
 

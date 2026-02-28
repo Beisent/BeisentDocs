@@ -1,15 +1,40 @@
 """Pure-Python Markdown-to-HTML converter with extensions."""
 
 import re
+from typing import Dict, List
 
 
 class MarkdownParser:
     """Pure-Python Markdown-to-HTML converter with extensions."""
 
     def __init__(self):
-        self.footnotes: dict[str, str] = {}
-        self.headings: list[dict] = []
-        self.heading_slugs: dict[str, int] = {}  # track slug usage for deduplication
+        self.footnotes: Dict[str, str] = {}
+        self.headings: List[Dict] = []
+        self.heading_slugs: Dict[str, int] = {}  # track slug usage for deduplication
+
+        # Pre-compile regex patterns for better performance
+        self._patterns = {
+            'footnote_def': re.compile(r'^\[\^(\w+)\]:\s*(.+)$', re.M),
+            'footnote_ref': re.compile(r'\[\^(\w+)\]'),
+            'fence': re.compile(r'^(`{3,}|~{3,})\s*(\S*)'),
+            'heading': re.compile(r'^(#{1,6})\s+(.*)'),
+            'hr': re.compile(r'^(\*{3,}|-{3,}|_{3,})\s*$'),
+            'ul': re.compile(r'^[\s]*[-*+]\s'),
+            'ol': re.compile(r'^[\s]*\d+\.\s'),
+            'table': re.compile(r'^\|.*\|$'),
+            'table_sep': re.compile(r'^\|[\s:|-]+\|$'),
+            'inline_code': re.compile(r'`([^`]+)`'),
+            'image': re.compile(r'!\[([^\]]*)\]\(([^)]+)\)'),
+            'link': re.compile(r'\[([^\]]+)\]\(([^)]+)\)'),
+            'bold_italic': re.compile(r'\*\*\*(.+?)\*\*\*'),
+            'bold': re.compile(r'\*\*(.+?)\*\*'),
+            'bold_alt': re.compile(r'__(.+?)__'),
+            'italic': re.compile(r'\*(.+?)\*'),
+            'italic_alt': re.compile(r'(?<!\w)_(.+?)_(?!\w)'),
+            'strikethrough': re.compile(r'~~(.+?)~~'),
+            'mark': re.compile(r'==(.+?)=='),
+            'math_inline': re.compile(r'(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)'),
+        }
 
     # ---- public API -------------------------------------------------------
 
@@ -26,12 +51,14 @@ class MarkdownParser:
     # ---- footnotes --------------------------------------------------------
 
     def _extract_footnotes(self, text: str) -> str:
+        """Extract footnotes from text."""
         def _repl(m):
             self.footnotes[m.group(1)] = m.group(2).strip()
             return ""
-        return re.sub(r'^\[\^(\w+)\]:\s*(.+)$', _repl, text, flags=re.M)
+        return self._patterns['footnote_def'].sub(_repl, text)
 
     def _insert_footnotes(self, html: str) -> str:
+        """Insert footnotes into HTML."""
         if not self.footnotes:
             return html
         def _repl(m):
@@ -40,7 +67,7 @@ class MarkdownParser:
                 return (f'<sup class="footnote-ref" id="fnref-{key}">'
                         f'<a href="#fn-{key}">{key}</a></sup>')
             return m.group(0)
-        html = re.sub(r'\[\^(\w+)\]', _repl, html)
+        html = self._patterns['footnote_ref'].sub(_repl, html)
         items = "".join(
             f'<li id="fn-{k}"><p>{self._inline(v)}'
             f' <a href="#fnref-{k}" class="footnote-back">&#8617;</a></p></li>'
@@ -276,31 +303,32 @@ class MarkdownParser:
     # ---- inline parsing ---------------------------------------------------
 
     def _inline(self, text: str) -> str:
+        """Parse inline markdown elements with optimized regex."""
         # protect inline code first by replacing with placeholders
         code_blocks = []
         def save_code(m):
             code_blocks.append(m.group(1))
             return f"\x00CODE{len(code_blocks)-1}\x00"
-        text = re.sub(r'`([^`]+)`', save_code, text)
+        text = self._patterns['inline_code'].sub(save_code, text)
 
         # images
-        text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', r'<img src="\2" alt="\1" loading="lazy">', text)
+        text = self._patterns['image'].sub(r'<img src="\2" alt="\1" loading="lazy">', text)
         # links
-        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', text)
+        text = self._patterns['link'].sub(r'<a href="\2">\1</a>', text)
         # bold + italic
-        text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text)
+        text = self._patterns['bold_italic'].sub(r'<strong><em>\1</em></strong>', text)
         # bold
-        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
-        text = re.sub(r'__(.+?)__', r'<strong>\1</strong>', text)
+        text = self._patterns['bold'].sub(r'<strong>\1</strong>', text)
+        text = self._patterns['bold_alt'].sub(r'<strong>\1</strong>', text)
         # italic (avoid matching underscores in words)
-        text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
-        text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'<em>\1</em>', text)
+        text = self._patterns['italic'].sub(r'<em>\1</em>', text)
+        text = self._patterns['italic_alt'].sub(r'<em>\1</em>', text)
         # strikethrough
-        text = re.sub(r'~~(.+?)~~', r'<del>\1</del>', text)
+        text = self._patterns['strikethrough'].sub(r'<del>\1</del>', text)
         # mark / highlight
-        text = re.sub(r'==(.+?)==', r'<mark>\1</mark>', text)
+        text = self._patterns['mark'].sub(r'<mark>\1</mark>', text)
         # inline math
-        text = re.sub(r'(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)', r'<span class="math-inline">\(\1\)</span>', text)
+        text = self._patterns['math_inline'].sub(r'<span class="math-inline">\(\1\)</span>', text)
         # line break
         text = re.sub(r'  $', '<br>', text)
 

@@ -5,6 +5,19 @@
 (function () {
   'use strict';
 
+  // ---- Performance optimization: debounce utility ----------------------
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
   // ---- Theme toggle ----------------------------------------------------
   const themeToggle = document.getElementById('theme-toggle');
   const html = document.documentElement;
@@ -93,13 +106,15 @@
   // ---- Back to top button ----------------------------------------------
   const backToTop = document.getElementById('back-to-top');
   if (backToTop) {
-    window.addEventListener('scroll', () => {
+    const handleScroll = debounce(() => {
       if (window.scrollY > 300) {
         backToTop.classList.add('visible');
       } else {
         backToTop.classList.remove('visible');
       }
-    });
+    }, 100);
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
 
     backToTop.addEventListener('click', () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -114,14 +129,17 @@
   const searchResults = document.getElementById('search-results');
   let searchIndex = [];
 
-  // Load search index
+  // Load search index with error handling
   if (searchModal) {
     // Determine base path from current location
     const basePath = document.querySelector('link[rel="stylesheet"]')?.getAttribute('href')?.replace('static/css/style.css', '') || '';
     fetch(`${basePath}search-index.json`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load search index');
+        return res.json();
+      })
       .then(data => { searchIndex = data; })
-      .catch(err => console.error('Failed to load search index:', err));
+      .catch(err => console.error('Search index error:', err));
   }
 
   // Open search modal
@@ -160,28 +178,28 @@
     }
   });
 
-  // Search logic
-  searchInput?.addEventListener('input', (e) => {
-    const query = e.target.value.trim().toLowerCase();
+  // Search logic with debouncing for better performance
+  const performSearch = debounce((query) => {
     if (!query) {
       searchResults.innerHTML = '';
       return;
     }
 
+    const lowerQuery = query.toLowerCase();
     const results = searchIndex.filter(item => {
-      return item.title.toLowerCase().includes(query) ||
-             item.description.toLowerCase().includes(query) ||
-             item.content.toLowerCase().includes(query);
+      return item.title.toLowerCase().includes(lowerQuery) ||
+             item.description.toLowerCase().includes(lowerQuery) ||
+             item.content.toLowerCase().includes(lowerQuery);
     }).slice(0, 10);
 
     if (results.length === 0) {
-      searchResults.innerHTML = '<div class="search-no-results">未找到相关结果</div>';
+      searchResults.innerHTML = '<div class="search-no-results">No results found</div>';
       return;
     }
 
     searchResults.innerHTML = results.map(item => {
       const highlightText = (text) => {
-        const regex = new RegExp(`(${query})`, 'gi');
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
         return text.replace(regex, '<span class="search-result-highlight">$1</span>');
       };
 
@@ -192,6 +210,10 @@
         </a>
       `;
     }).join('');
+  }, 200);
+
+  searchInput?.addEventListener('input', (e) => {
+    performSearch(e.target.value.trim());
   });
 
 })();
