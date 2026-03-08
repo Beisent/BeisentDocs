@@ -149,7 +149,7 @@ class MarkdownParser:
             # blockquote
             if line.startswith(">"):
                 bq_lines: list[str] = []
-                while i < len(lines) and (lines[i].startswith(">") or (lines[i].strip() and bq_lines)):
+                while i < len(lines) and lines[i].startswith(">"):
                     bq_lines.append(re.sub(r'^>\s?', '', lines[i]))
                     i += 1
                 inner = self._parse_blocks("\n".join(bq_lines))
